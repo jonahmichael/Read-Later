@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Read Later — Tech Article Organizer</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/ogl@0.0.88/dist/ogl.umd.js"></script>
+</head>
+<body>
+<canvas id="aurora-canvas"></canvas>
+<div class="watermark">Created by Jonah Paulin Joyce</div>
+<div class="container">
+    <header>
+        <h1>Read Later</h1>
+        <h2>Save, Tag, and Manage Articles for Future Reading   </h2>
+    </header>
+
+    <section class="add-article">
+        <input id="articleUrl" type="url" placeholder="Paste article URL here..." aria-label="Article URL">
+        <button id="addArticleBtn">Add Article</button>
+    </section>
+
+    <section class="filters">
+        <div class="status-filters">
+            <button class="filter-btn active" id="showAll">All</button>
+            <button class="filter-btn" id="showUnread">Unread</button>
+            <button class="filter-btn" id="showRead">Read</button>
+        </div>
+        <input id="tagFilter" type="text" placeholder="Filter by tag..." aria-label="Filter by tag">
+    </section>
+
+    <section class="articles">
+        <ul id="articleList"></ul>
+    </section>
+
+    <!-- Edit Article Modal -->
+    <div id="editModal" class="modal" aria-hidden="true">
+        <div class="modal-content">
+            <span class="close-button" data-modal="editModal">&times;</span>
+            <h2>Edit Article</h2>
+            <label for="editTitle">Title</label>
+            <input id="editTitle" type="text">
+
+            <label for="editUrl">URL</label>
+            <input id="editUrl" type="url">
+
+            <label for="editTags">Tags (comma separated)</label>
+            <input id="editTags" type="text" placeholder="e.g. javascript,react">
+
+            <label for="editNotes">Notes</label>
+            <textarea id="editNotes" rows="6"></textarea>
+
+            <div class="modal-actions">
+                <button id="saveEditBtn">Save</button>
+                <button class="cancel-btn" data-modal="editModal">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notes & Tags Modal -->
+    <div id="notesTagsModal" class="modal" aria-hidden="true">
+        <div class="modal-content">
+            <span class="close-button" data-modal="notesTagsModal">&times;</span>
+            <h2>Notes & Tags</h2>
+
+            <label for="notesTagsTags">Tags (comma separated)</label>
+            <input id="notesTagsTags" type="text" placeholder="e.g. tutorial,css">
+
+            <label for="notesTagsNotes">Notes</label>
+            <textarea id="notesTagsNotes" rows="6"></textarea>
+
+            <div class="modal-actions">
+                <button id="saveNotesTagsBtn">Save</button>
+                <button class="cancel-btn" data-modal="notesTagsModal">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <small>All data is stored locally in your browser (localStorage).</small>
+    </footer>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
