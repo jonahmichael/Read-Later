@@ -42,50 +42,13 @@ Read Later is designed for developers, tech enthusiasts, and lifelong learners w
 - Requests (HTTP library)
 - Flask-CORS (Cross-origin resource sharing)
 
-## Installation
+## Live Application
 
-### Prerequisites
-- Python 3.7 or higher
+The application is hosted on Vercel and can be accessed directly through your web browser. Simply visit the application URL and start adding articles immediately.
+
+### System Requirements
 - Modern web browser with JavaScript and WebGL support
-- Internet connection (for metadata extraction)
-
-### Backend Setup
-
-1. Navigate to the backend directory:
-```powershell
-cd backend
-```
-
-2. Create a Python virtual environment (recommended):
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-```
-
-3. Install required dependencies:
-```powershell
-pip install -r requirements.txt
-```
-
-4. Start the Flask server:
-```powershell
-python app.py
-```
-
-The backend server will run on `http://127.0.0.1:5000`. Keep this terminal window open while using the application.
-
-### Frontend Setup
-
-1. Open the frontend in your browser:
-   - **Option A**: Double-click `index.html` to open directly in your browser
-   - **Option B**: Use a local development server (recommended):
-     ```powershell
-     python -m http.server 8000
-     ```
-     Then navigate to `http://localhost:8000`
-   - **Option C**: Use VS Code's Live Server extension
-
-2. Start adding articles by pasting URLs into the input field
+- Internet connection for metadata extraction and article management
 
 ## Usage Guide
 
@@ -127,7 +90,7 @@ The backend server will run on `http://127.0.0.1:5000`. Keep this terminal windo
 
 Extracts metadata from a given article URL.
 
-**Endpoint**: `http://127.0.0.1:5000/extract-metadata`
+**Endpoint**: `/api/extract-metadata`
 
 **Request Body**:
 ```json
@@ -177,10 +140,10 @@ This server-side approach bypasses browser CORS restrictions that would prevent 
 
 Articles are stored in browser localStorage under the key `techArticles`. View mode preference is stored under `techArticles_viewMode`.
 
-**Implications**:
+**Key Features**:
 - Data persists across browser sessions
 - No server-side database or authentication required
-- Data is device and browser-specific (does not sync)
+- Data is device and browser-specific (does not sync across devices)
 - Clearing browser data will delete saved articles
 - Storage limit typically 5-10MB depending on browser
 
@@ -209,23 +172,13 @@ Articles are stored in browser localStorage under the key `techArticles`. View m
 
 ## Known Limitations
 
-1. **Backend Dependency**: Flask backend must be running for metadata extraction
-2. **Website Restrictions**: Some websites block automated scraping or require authentication
-3. **Storage Limits**: localStorage typically limited to 5-10MB depending on browser
-4. **Single Device**: No cloud synchronization; data tied to specific browser and device
-5. **CORS Constraints**: Even with backend, some sites may have strict content policies
-6. **Image Loading**: Some preview images may fail to load due to CORS or relative paths
+1. **Website Restrictions**: Some websites block automated scraping or require authentication
+2. **Storage Limits**: localStorage typically limited to 5-10MB depending on browser
+3. **Single Device**: No cloud synchronization; data tied to specific browser and device
+4. **CORS Constraints**: Some sites may have strict content policies
+5. **Image Loading**: Some preview images may fail to load due to CORS or relative paths
 
 ## Troubleshooting
-
-### Backend Connection Issues
-**Problem**: "Failed to get article details from backend"
-
-**Solutions**:
-- Verify Flask server is running on port 5000
-- Check no other application is using port 5000
-- Confirm Python dependencies are correctly installed
-- Check firewall settings if applicable
 
 ### Missing Metadata
 **Problem**: Article added but no title/description
@@ -247,20 +200,19 @@ Articles are stored in browser localStorage under the key `techArticles`. View m
 
 **Note**: Application automatically hides broken images
 
-## Development
+## Deployment
 
-### Changing Backend Port
+This application is deployed on Vercel with serverless functions handling the backend API. The Flask backend has been adapted to work as a Vercel serverless function.
 
-Edit `backend/app.py`:
-```python
-if __name__ == '__main__':
-    app.run(debug=True, port=YOUR_PORT)
-```
+### For Developers
 
-Update `script.js`:
-```javascript
-const BACKEND_API_URL = 'http://127.0.0.1:YOUR_PORT/extract-metadata';
-```
+If you want to deploy your own instance:
+
+1. Fork or clone this repository
+2. Create a Vercel account at [vercel.com](https://vercel.com)
+3. Import your repository in Vercel
+4. Vercel will automatically detect and deploy the application
+5. The backend API will be available at `/api/extract-metadata`
 
 ### Customizing Colors
 
@@ -304,10 +256,10 @@ Potential improvements for future development:
 ## Data Privacy
 
 All article data is stored exclusively in your browser's localStorage. No personal data is transmitted to external servers except for:
-- Article URLs sent to the Flask backend for metadata extraction
-- HTTP requests from backend to target article URLs
+- Article URLs sent to the backend API for metadata extraction
+- HTTP requests from backend to target article URLs during extraction
 
-The application does not collect, store, or transmit any personal information to third parties.
+The application does not collect, store, or transmit any personal information to third parties. Your reading list and notes remain private on your device.
 
 ## License
 
