@@ -4,14 +4,17 @@
 
 const STORAGE_KEY = 'techArticles';
 const BACKEND_API_URL = 'http://127.0.0.1:5000/extract-metadata'; // Backend API endpoint
+const VIEW_MODE_KEY = 'techArticles_viewMode'; // Store view preference
 
 let articles = [];
 let currentFilter = 'all'; // 'all' | 'read' | 'unread'
 let currentTagFilter = '';
+let viewMode = 'list'; // 'list' | 'grid'
 
 // DOM refs
 let articleUrlInput, addArticleBtn, articleListEl;
 let showAllBtn, showUnreadBtn, showReadBtn, tagFilterInput;
+let listViewBtn, gridViewBtn;
 
 // Modals and fields
 let editModal, editTitleInput, editUrlInput, editTagsInput, editNotesInput, saveEditBtn;
@@ -31,6 +34,10 @@ function init() {
     showReadBtn = document.getElementById('showRead');
     tagFilterInput = document.getElementById('tagFilter');
 
+    // View toggle buttons
+    listViewBtn = document.getElementById('listView');
+    gridViewBtn = document.getElementById('gridView');
+
     // Modals
     editModal = document.getElementById('editModal');
     editTitleInput = document.getElementById('editTitle');
@@ -46,6 +53,8 @@ function init() {
 
     // Load and render
     articles = loadArticles();
+    viewMode = loadViewMode();
+    applyViewMode(viewMode);
     renderArticles();
 
     // Event listeners
@@ -64,6 +73,10 @@ function init() {
         currentTagFilter = e.target.value.trim().toLowerCase();
         renderArticles();
     });
+
+    // View toggle handlers
+    listViewBtn.addEventListener('click', () => setViewMode('list'));
+    gridViewBtn.addEventListener('click', () => setViewMode('grid'));
 
     // Delegated events for article actions
     articleListEl.addEventListener('click', handleArticleListClick);
@@ -447,8 +460,43 @@ function hideModal(modal) {
 // Simple logging helper (could be enhanced)
 function log(...args) { console.log('[ReadLater]', ...args); }
 
+// View mode management
+function loadViewMode() {
+    try {
+        return localStorage.getItem(VIEW_MODE_KEY) || 'list';
+    } catch (err) {
+        return 'list';
+    }
+}
+
+function saveViewMode(mode) {
+    try {
+        localStorage.setItem(VIEW_MODE_KEY, mode);
+    } catch (err) {
+        console.error('Failed to save view mode', err);
+    }
+}
+
+function setViewMode(mode) {
+    viewMode = mode;
+    saveViewMode(mode);
+    applyViewMode(mode);
+}
+
+function applyViewMode(mode) {
+    if (mode === 'grid') {
+        articleListEl.classList.add('grid-view');
+        listViewBtn.classList.remove('active');
+        gridViewBtn.classList.add('active');
+    } else {
+        articleListEl.classList.remove('grid-view');
+        listViewBtn.classList.add('active');
+        gridViewBtn.classList.remove('active');
+    }
+}
+
 // Optional: expose articles for debugging in console
-window._readLater = { getAll: () => articles };
+window._readLater = { getAll: () => articles, setView: setViewMode };
 
 // End of script
 // Note on Backend: This version uses a Flask backend API to extract article metadata
