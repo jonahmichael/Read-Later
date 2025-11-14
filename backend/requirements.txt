@@ -2,3 +2,6 @@ Flask
 flask-cors
 requests
 beautifulsoup4
+gunicorn
+google-cloud-firestore
+google-cloud-firestore

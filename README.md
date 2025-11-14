@@ -76,12 +76,15 @@ The application is hosted on Vercel and can be accessed directly through your we
 01-Read Later/
 ├── backend/
 │   ├── app.py              # Flask API server with metadata extraction
-│   └── requirements.txt    # Python dependencies
+│   ├── requirements.txt    # Python dependencies
+│   ├── Dockerfile          # Docker container configuration
+│   └── .dockerignore       # Files excluded from Docker build
 ├── index.html              # Main HTML structure
 ├── style.css               # Complete styling and animations
 ├── script.js               # Application logic and state management
 ├── aurora.js               # WebGL aurora background effect
-└── README.md               # Project documentation
+├── README.md               # Project documentation
+└── DEPLOYMENT.md           # Detailed deployment guide for Google Cloud Run
 ```
 
 ## API Documentation
@@ -202,17 +205,25 @@ Articles are stored in browser localStorage under the key `techArticles`. View m
 
 ## Deployment
 
-This application is deployed on Vercel with serverless functions handling the backend API. The Flask backend has been adapted to work as a Vercel serverless function.
+This application is deployed with:
+- **Frontend**: Vercel (or similar static hosting platform)
+- **Backend**: Google Cloud Run (serverless container platform)
 
-### For Developers
+The backend API is containerized using Docker and deployed to Google Cloud Run, which offers a generous free tier:
+- 2 million requests per month
+- 360,000 GB-seconds of memory
+- 180,000 vCPU-seconds of compute time
+- 1 GB of egress data per month
 
-If you want to deploy your own instance:
+### Deploy Your Own Instance
 
+For detailed instructions on deploying your own instance of this application, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+
+**Quick Overview**:
 1. Fork or clone this repository
-2. Create a Vercel account at [vercel.com](https://vercel.com)
-3. Import your repository in Vercel
-4. Vercel will automatically detect and deploy the application
-5. The backend API will be available at `/api/extract-metadata`
+2. Deploy frontend to Vercel/Netlify
+3. Deploy backend to Google Cloud Run using the provided Dockerfile
+4. Update `script.js` with your Cloud Run service URL
 
 ### Customizing Colors
 

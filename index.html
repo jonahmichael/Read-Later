@@ -9,96 +9,142 @@
 <body>
 <canvas id="aurora-canvas"></canvas>
 <div class="watermark">Jonah Paulin Joyce</div>
-<div class="container">
-    <header>
-        <h1>Read Later</h1>
-        <h2>Save, Tag, and Manage Articles for Future Reading   </h2>
-    </header>
 
-    <section class="add-article">
-        <input id="articleUrl" type="url" placeholder="Paste article URL here..." aria-label="Article URL">
-        <button id="addArticleBtn">Add Article</button>
-    </section>
-
-    <section class="filters">
-        <div class="status-filters">
-            <button class="filter-btn active" id="showAll">All</button>
-            <button class="filter-btn" id="showUnread">Unread</button>
-            <button class="filter-btn" id="showRead">Read</button>
-        </div>
-        <input id="tagFilter" type="text" placeholder="Filter by tag..." aria-label="Filter by tag">
-        <div class="view-toggle">
-            <button class="view-btn active" id="listView" title="List View">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="8" y1="6" x2="21" y2="6"></line>
-                    <line x1="8" y1="12" x2="21" y2="12"></line>
-                    <line x1="8" y1="18" x2="21" y2="18"></line>
-                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                </svg>
-            </button>
-            <button class="view-btn" id="gridView" title="Grid View">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="14" width="7" height="7"></rect>
-                    <rect x="3" y="14" width="7" height="7"></rect>
+<!-- Main Application Layout -->
+<div class="app-layout">
+    <!-- Sidebar for Sections -->
+    <aside id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <h3>Sections</h3>
+            <button id="closeSidebarBtn" class="close-sidebar-btn" title="Close Sidebar">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
             </button>
         </div>
-    </section>
+        
+        <!-- Add Section Form -->
+        <div id="addSectionForm" class="add-section-form">
+            <input id="sectionNameInput" type="text" placeholder="New section name..." aria-label="Section name">
+            <button id="addSectionBtn" title="Add Section">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </button>
+        </div>
 
-    <section class="articles">
-        <ul id="articleList"></ul>
-    </section>
+        <!-- Sections List -->
+        <ul id="sectionList" class="section-list"></ul>
+    </aside>
 
-    <!-- Edit Article Modal -->
-    <div id="editModal" class="modal" aria-hidden="true">
-        <div class="modal-content">
-            <span class="close-button" data-modal="editModal">&times;</span>
-            <h2>Edit Article</h2>
-            <label for="editTitle">Title</label>
-            <input id="editTitle" type="text">
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <div class="container">
+            <header>
+                <button id="burgerMenuBtn" class="burger-menu-btn" title="Toggle Sidebar">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                <h1>Read Later</h1>
+                <h2 id="currentSectionTitle">Unlisted</h2>
+            </header>
 
-            <label for="editUrl">URL</label>
-            <input id="editUrl" type="url">
+            <section class="add-article">
+                <input id="articleUrl" type="url" placeholder="Paste article URL here..." aria-label="Article URL">
+                <button id="addArticleBtn">Add Article</button>
+            </section>
 
-            <label for="editTags">Tags (comma separated)</label>
-            <input id="editTags" type="text" placeholder="e.g. javascript,react">
+            <section class="filters">
+                <div class="status-filters">
+                    <button class="filter-btn active" id="showAll">All</button>
+                    <button class="filter-btn" id="showUnread">Unread</button>
+                    <button class="filter-btn" id="showRead">Read</button>
+                </div>
+                <input id="tagFilter" type="text" placeholder="Filter by tag..." aria-label="Filter by tag">
+                <div class="view-toggle">
+                    <button class="view-btn active" id="listView" title="List View">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="8" y1="6" x2="21" y2="6"></line>
+                            <line x1="8" y1="12" x2="21" y2="12"></line>
+                            <line x1="8" y1="18" x2="21" y2="18"></line>
+                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                        </svg>
+                    </button>
+                    <button class="view-btn" id="gridView" title="Grid View">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="3" width="7" height="7"></rect>
+                            <rect x="14" y="14" width="7" height="7"></rect>
+                            <rect x="3" y="14" width="7" height="7"></rect>
+                        </svg>
+                    </button>
+                </div>
+            </section>
 
-            <label for="editNotes">Notes</label>
-            <textarea id="editNotes" rows="6"></textarea>
+            <section class="articles">
+                <ul id="articleList"></ul>
+            </section>
 
-            <div class="modal-actions">
-                <button id="saveEditBtn">Save</button>
-                <button class="cancel-btn" data-modal="editModal">Cancel</button>
-            </div>
+            <footer>
+                <small>All data is stored in Google Firestore cloud database.</small>
+            </footer>
+        </div>
+    </main>
+</div>
+
+<!-- Edit Article Modal -->
+<div id="editModal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+        <span class="close-button" data-modal="editModal">&times;</span>
+        <h2>Edit Article</h2>
+        <label for="editTitle">Title</label>
+        <input id="editTitle" type="text">
+
+        <label for="editUrl">URL</label>
+        <input id="editUrl" type="url">
+
+        <label for="editSection">Section</label>
+        <select id="editSection">
+            <option value="unlisted">Unlisted</option>
+        </select>
+
+        <label for="editTags">Tags (comma separated)</label>
+        <input id="editTags" type="text" placeholder="e.g. javascript,react">
+
+        <label for="editNotes">Notes</label>
+        <textarea id="editNotes" rows="6"></textarea>
+
+        <div class="modal-actions">
+            <button id="saveEditBtn">Save</button>
+            <button class="cancel-btn" data-modal="editModal">Cancel</button>
         </div>
     </div>
+</div>
 
-    <!-- Notes & Tags Modal -->
-    <div id="notesTagsModal" class="modal" aria-hidden="true">
-        <div class="modal-content">
-            <span class="close-button" data-modal="notesTagsModal">&times;</span>
-            <h2>Notes & Tags</h2>
+<!-- Notes & Tags Modal -->
+<div id="notesTagsModal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+        <span class="close-button" data-modal="notesTagsModal">&times;</span>
+        <h2>Notes & Tags</h2>
 
-            <label for="notesTagsTags">Tags (comma separated)</label>
-            <input id="notesTagsTags" type="text" placeholder="e.g. tutorial,css">
+        <label for="notesTagsTags">Tags (comma separated)</label>
+        <input id="notesTagsTags" type="text" placeholder="e.g. tutorial,css">
 
-            <label for="notesTagsNotes">Notes</label>
-            <textarea id="notesTagsNotes" rows="6"></textarea>
+        <label for="notesTagsNotes">Notes</label>
+        <textarea id="notesTagsNotes" rows="6"></textarea>
 
-            <div class="modal-actions">
-                <button id="saveNotesTagsBtn">Save</button>
-                <button class="cancel-btn" data-modal="notesTagsModal">Cancel</button>
-            </div>
+        <div class="modal-actions">
+            <button id="saveNotesTagsBtn">Save</button>
+            <button class="cancel-btn" data-modal="notesTagsModal">Cancel</button>
         </div>
     </div>
-
-    <footer>
-        <small>All data is stored locally in your browser (localStorage).</small>
-    </footer>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/ogl@0.0.88/dist/ogl.umd.js"></script>

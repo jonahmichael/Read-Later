@@ -1,493 +1,565 @@
-// Read Later — Tech Article Organizer (Full Stack Version)
-// Data is stored in localStorage under key: 'techArticles'
-// Backend API for metadata extraction
+// Read Later — Full-Stack Tech Article Organizer
+// Data is stored in Google Firestore via Cloud Run backend
 
-const STORAGE_KEY = 'techArticles';
-const BACKEND_API_URL = 'http://127.0.0.1:5000/extract-metadata'; // Backend API endpoint
-const VIEW_MODE_KEY = 'techArticles_viewMode'; // Store view preference
+// ===================================================================================
+// 1. Configuration & State (Lines 1-30)
+// ===================================================================================
+const BACKEND_API_URL = 'https://read-later-backend-478110.a.run.app';
+const VIEW_MODE_KEY = 'techArticles_viewMode';
 
-let articles = [];
-let currentFilter = 'all'; // 'all' | 'read' | 'unread'
+// Global state variables
+let sections = [];
+let currentArticles = [];
+let currentSectionId = 'unlisted';
+let currentFilter = 'all';
 let currentTagFilter = '';
-let viewMode = 'list'; // 'list' | 'grid'
+let viewMode = 'list';
+let currentEditingArticleId = null;
+let currentNotesTagsArticleId = null;
 
-// DOM refs
+// DOM references
+let sectionListEl, sectionNameInput, addSectionBtn;
+let currentSectionTitleEl;
 let articleUrlInput, addArticleBtn, articleListEl;
 let showAllBtn, showUnreadBtn, showReadBtn, tagFilterInput;
 let listViewBtn, gridViewBtn;
-
-// Modals and fields
-let editModal, editTitleInput, editUrlInput, editTagsInput, editNotesInput, saveEditBtn;
+let editModal, editTitleInput, editUrlInput, editSectionSelect, editTagsInput, editNotesInput, saveEditBtn;
 let notesTagsModal, notesTagsTagsInput, notesTagsNotesInput, saveNotesTagsBtn;
+let burgerMenuBtn, closeSidebarBtn, sidebar, sidebarOverlay;
 
-// when DOM ready
+// Initialize the application once the DOM is fully loaded
 window.addEventListener('DOMContentLoaded', init);
 
-function init() {
-    // DOM refs
+// ===================================================================================
+// 2. API Service Layer (Lines 32-170)
+// ===================================================================================
+const api = {
+    async _handleResponse(response) {
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: 'An unknown error occurred' }));
+            throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    },
+
+    async fetchSections() {
+        try {
+            const response = await fetch(`${BACKEND_API_URL}/sections`);
+            return await this._handleResponse(response);
+        } catch (error) {
+            showNotification(`Error fetching sections: ${error.message}`, 'error');
+            return [];
+        }
+    },
+
+    async createSection(name) {
+        try {
+            const response = await fetch(`${BACKEND_API_URL}/sections`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name }),
+            });
+            return await this._handleResponse(response);
+        } catch (error) {
+            showNotification(`Error creating section: ${error.message}`, 'error');
+            return null;
+        }
+    },
+    
+    async deleteSection(sectionId) {
+        try {
+            const response = await fetch(`${BACKEND_API_URL}/sections/${sectionId}`, { method: 'DELETE' });
+            return await this._handleResponse(response);
+        } catch (error) {
+            showNotification(`Error deleting section: ${error.message}`, 'error');
+            return null;
+        }
+    },
+
+    async fetchArticlesForSection(sectionId) {
+        try {
+            const response = await fetch(`${BACKEND_API_URL}/articles/section/${sectionId}`);
+            return await this._handleResponse(response);
+        } catch (error) {
+            showNotification(`Error fetching articles: ${error.message}`, 'error');
+            return [];
+        }
+    },
+
+    async addArticle(url, sectionId) {
+        try {
+            const response = await fetch(`${BACKEND_API_URL}/articles`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url, sectionId }),
+            });
+            return await this._handleResponse(response);
+        } catch (error) {
+            showNotification(`Error adding article: ${error.message}`, 'error');
+            return null;
+        }
+    },
+
+    async updateArticle(articleId, updates) {
+        try {
+            const response = await fetch(`${BACKEND_API_URL}/articles/${articleId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates),
+            });
+            return await this._handleResponse(response);
+        } catch (error) {
+            showNotification(`Error updating article: ${error.message}`, 'error');
+            return null;
+        }
+    },
+
+    async deleteArticle(articleId) {
+        try {
+            const response = await fetch(`${BACKEND_API_URL}/articles/${articleId}`, { method: 'DELETE' });
+            return await this._handleResponse(response);
+        } catch (error) {
+            showNotification(`Error deleting article: ${error.message}`, 'error');
+            return null;
+        }
+    }
+};
+
+// ===================================================================================
+// 3. Initialization (Lines 172-250)
+// ===================================================================================
+async function init() {
+    // Assign all DOM references
+    sectionListEl = document.getElementById('sectionList');
+    sectionNameInput = document.getElementById('sectionNameInput');
+    addSectionBtn = document.getElementById('addSectionBtn');
+    currentSectionTitleEl = document.getElementById('currentSectionTitle');
     articleUrlInput = document.getElementById('articleUrl');
     addArticleBtn = document.getElementById('addArticleBtn');
     articleListEl = document.getElementById('articleList');
-
     showAllBtn = document.getElementById('showAll');
     showUnreadBtn = document.getElementById('showUnread');
     showReadBtn = document.getElementById('showRead');
     tagFilterInput = document.getElementById('tagFilter');
-
-    // View toggle buttons
     listViewBtn = document.getElementById('listView');
     gridViewBtn = document.getElementById('gridView');
-
-    // Modals
     editModal = document.getElementById('editModal');
     editTitleInput = document.getElementById('editTitle');
     editUrlInput = document.getElementById('editUrl');
+    editSectionSelect = document.getElementById('editSection');
     editTagsInput = document.getElementById('editTags');
     editNotesInput = document.getElementById('editNotes');
     saveEditBtn = document.getElementById('saveEditBtn');
-
     notesTagsModal = document.getElementById('notesTagsModal');
     notesTagsTagsInput = document.getElementById('notesTagsTags');
     notesTagsNotesInput = document.getElementById('notesTagsNotes');
     saveNotesTagsBtn = document.getElementById('saveNotesTagsBtn');
+    
+    // Sidebar elements
+    burgerMenuBtn = document.getElementById('burgerMenuBtn');
+    closeSidebarBtn = document.getElementById('closeSidebarBtn');
+    sidebar = document.getElementById('sidebar');
+    
+    // Create sidebar overlay element
+    sidebarOverlay = document.createElement('div');
+    sidebarOverlay.className = 'sidebar-overlay';
+    document.body.appendChild(sidebarOverlay);
+    
+    setupEventListeners();
+    loadViewMode();
+    await loadInitialData();
+    console.log('Read Later app initialized');
+}
 
-    // Load and render
-    articles = loadArticles();
-    viewMode = loadViewMode();
-    applyViewMode(viewMode);
+async function loadInitialData() {
+    showLoading(true);
+    sections = await api.fetchSections();
+    renderSections();
+    await loadArticlesForCurrentSection();
+    showLoading(false);
+}
+
+async function loadArticlesForCurrentSection() {
+    showLoading(true);
+    currentArticles = await api.fetchArticlesForSection(currentSectionId);
     renderArticles();
+    showLoading(false);
+}
 
-    // Event listeners
-    addArticleBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const url = articleUrlInput.value.trim();
-        if (!url) return;
-        addArticle(url);
+function setupEventListeners() {
+    addSectionBtn.addEventListener('click', handleAddSection);
+    addArticleBtn.addEventListener('click', handleAddArticle);
+    
+    // Enter key support
+    sectionNameInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleAddSection();
+    });
+    articleUrlInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleAddArticle();
     });
 
-    // Filters
     showAllBtn.addEventListener('click', () => setFilter('all'));
     showUnreadBtn.addEventListener('click', () => setFilter('unread'));
     showReadBtn.addEventListener('click', () => setFilter('read'));
-    tagFilterInput.addEventListener('input', (e) => {
-        currentTagFilter = e.target.value.trim().toLowerCase();
-        renderArticles();
-    });
-
-    // View toggle handlers
+    tagFilterInput.addEventListener('input', handleTagFilterChange);
+    
     listViewBtn.addEventListener('click', () => setViewMode('list'));
     gridViewBtn.addEventListener('click', () => setViewMode('grid'));
 
-    // Delegated events for article actions
-    articleListEl.addEventListener('click', handleArticleListClick);
-    articleListEl.addEventListener('change', handleArticleListChange);
-
-    // Modal close handlers (close button and cancel)
-    document.querySelectorAll('.close-button').forEach(btn => {
-        btn.addEventListener('click', (e) => hideModal(document.getElementById(btn.dataset.modal)));
-    });
-    document.querySelectorAll('.cancel-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => hideModal(document.getElementById(btn.dataset.modal)));
-    });
-
-    // Close when clicking outside modal content
-    window.addEventListener('click', (e) => {
-        if (e.target === editModal) hideModal(editModal);
-        if (e.target === notesTagsModal) hideModal(notesTagsModal);
-    });
-
-    // Save handlers for modals
-    saveEditBtn.addEventListener('click', () => {
-        const id = editModal.dataset.articleId;
-        if (!id) return;
-        const newTitle = editTitleInput.value.trim() || 'Untitled Article';
-        let newUrl = editUrlInput.value.trim();
-        try { newUrl = new URL(newUrl).toString(); } catch (err) { /* keep original if invalid */ }
-        const newTags = parseTagsString(editTagsInput.value);
-        const newNotes = editNotesInput.value || '';
-        saveEdit(id, newTitle, newUrl, newNotes, newTags);
-        hideModal(editModal);
-    });
-
-    saveNotesTagsBtn.addEventListener('click', () => {
-        const id = notesTagsModal.dataset.articleId;
-        if (!id) return;
-        const tags = parseTagsString(notesTagsTagsInput.value);
-        const notes = notesTagsNotesInput.value || '';
-        saveNotesTags(id, notes, tags);
-        hideModal(notesTagsModal);
-    });
-}
-
-// ---------- Storage ----------
-function saveArticles() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(articles));
-}
-
-function loadArticles() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY) || '[]';
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-        return [];
-    } catch (err) {
-        console.error('Failed to load articles from localStorage', err);
-        return [];
-    }
-}
-
-// ---------- Rendering ----------
-function renderArticles() {
-    // Clear
-    articleListEl.innerHTML = '';
-
-    // Filter
-    const filtered = articles.filter(a => {
-        if (currentFilter === 'read' && !a.read) return false;
-        if (currentFilter === 'unread' && a.read) return false;
-        if (currentTagFilter) {
-            const t = currentTagFilter;
-            const hasTag = (a.tags || []).some(tag => tag.toLowerCase().includes(t));
-            if (!hasTag) return false;
+    saveEditBtn.addEventListener('click', handleSaveEdit);
+    saveNotesTagsBtn.addEventListener('click', handleSaveNotesTags);
+    
+    // Sidebar toggle
+    burgerMenuBtn.addEventListener('click', toggleSidebar);
+    closeSidebarBtn.addEventListener('click', closeSidebarMenu);
+    sidebarOverlay.addEventListener('click', closeSidebarMenu);
+    
+    // Close modals with close button, cancel button, or clicking outside
+    editModal.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal') || 
+            e.target.classList.contains('close-button') || 
+            e.target.classList.contains('cancel-btn')) {
+            closeModal(editModal);
         }
-        return true;
-    }).sort((a,b) => b.timestamp - a.timestamp); // newest first
+    });
+    notesTagsModal.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal') || 
+            e.target.classList.contains('close-button') || 
+            e.target.classList.contains('cancel-btn')) {
+            closeModal(notesTagsModal);
+        }
+    });
+}
 
-    if (filtered.length === 0) {
-        const empty = document.createElement('p');
-        empty.textContent = 'No articles yet. Add one above to get started.';
-        empty.style.cssText = 'color: #95a5a6; text-align: center; padding: 60px 20px; font-size: 16px; font-weight: 500; opacity: 0.8;';
-        articleListEl.appendChild(empty);
+// ===================================================================================
+// 4. Section Management (Lines 252-400)
+// ===================================================================================
+async function handleAddSection() {
+    const name = sectionNameInput.value.trim();
+    if (!name) {
+        showNotification('Section name cannot be empty.', 'error');
         return;
     }
 
-    filtered.forEach((article, index) => {
-        const li = document.createElement('li');
-        li.className = 'article-item' + (article.read ? ' read' : '');
-        li.dataset.id = article.id;
-        li.style.animation = `fadeInUp 0.5s ease-out ${index * 0.05}s both`;
+    addSectionBtn.disabled = true;
+    const newSection = await api.createSection(name);
+    addSectionBtn.disabled = false;
 
-        // Header
-        const header = document.createElement('div');
-        header.className = 'article-header';
+    if (newSection) {
+        sections.push(newSection);
+        renderSections();
+        sectionNameInput.value = '';
+        showNotification(`Section "${name}" created.`, 'success');
+    }
+}
 
-        const titleH3 = document.createElement('h3');
-        titleH3.className = 'article-title';
-        const a = document.createElement('a');
-        a.href = article.url;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.textContent = article.title || article.url || 'Untitled Article';
-        titleH3.appendChild(a);
+async function handleDeleteSection(sectionId, sectionName) {
+    if (!confirm(`Are you sure you want to delete the section "${sectionName}" and all its articles? This cannot be undone.`)) {
+        return;
+    }
 
-        const actions = document.createElement('div');
-        actions.className = 'article-actions';
+    showLoading(true);
+    const result = await api.deleteSection(sectionId);
+    showLoading(false);
 
-        // Read toggle
-        const readLabel = document.createElement('label');
-        readLabel.className = 'read-toggle';
-        const readCheckbox = document.createElement('input');
-        readCheckbox.type = 'checkbox';
-        readCheckbox.className = 'read-checkbox';
-        readCheckbox.checked = !!article.read;
-        readCheckbox.dataset.id = article.id;
-        readLabel.appendChild(readCheckbox);
-        const readText = document.createTextNode(' Read');
-        readLabel.appendChild(readText);
+    if (result) {
+        sections = sections.filter(s => s.id !== sectionId);
+        if (currentSectionId === sectionId) {
+            await handleSelectSection('unlisted');
+        } else {
+            renderSections();
+        }
+        showNotification(`Section "${sectionName}" deleted.`, 'success');
+    }
+}
 
-        const notesBtn = document.createElement('button');
-        notesBtn.className = 'notes-tags-btn';
-        notesBtn.textContent = 'Notes/Tags';
-        notesBtn.dataset.id = article.id;
+async function handleSelectSection(sectionId) {
+    currentSectionId = sectionId;
+    const selectedSection = sections.find(s => s.id === sectionId);
+    currentSectionTitleEl.textContent = selectedSection ? selectedSection.name : 'Unlisted';
+    
+    renderSections(); // To update the active class
+    await loadArticlesForCurrentSection();
+    
+    // Close sidebar on mobile after selection
+    closeSidebarMenu();
+}
 
-        const editBtn = document.createElement('button');
-        editBtn.className = 'edit-btn';
-        editBtn.textContent = 'Edit';
-        editBtn.dataset.id = article.id;
+function renderSections() {
+    sectionListEl.innerHTML = '';
+    
+    // Add the static "Unlisted" section
+    const unlistedEl = createSectionElement({ id: 'unlisted', name: 'Unlisted' });
+    sectionListEl.appendChild(unlistedEl);
 
+    // Add user-created sections
+    sections.forEach(section => {
+        const sectionEl = createSectionElement(section, true); // true for deletable
+        sectionListEl.appendChild(sectionEl);
+    });
+    updateEditSectionDropdown();
+}
+
+function createSectionElement(section, deletable = false) {
+    const li = document.createElement('li');
+    li.className = 'section-item';
+    li.dataset.id = section.id;
+    if (section.id === currentSectionId) {
+        li.classList.add('active');
+    }
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = section.name;
+    nameSpan.onclick = () => handleSelectSection(section.id);
+    li.appendChild(nameSpan);
+
+    if (deletable) {
         const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'delete-btn';
-        deleteBtn.textContent = 'Delete';
-        deleteBtn.dataset.id = article.id;
+        deleteBtn.className = 'delete-section-btn';
+        deleteBtn.innerHTML = '&times;';
+        deleteBtn.onclick = (e) => {
+            e.stopPropagation();
+            handleDeleteSection(section.id, section.name);
+        };
+        li.appendChild(deleteBtn);
+    }
+    return li;
+}
 
-        actions.appendChild(readLabel);
-        actions.appendChild(notesBtn);
-        actions.appendChild(editBtn);
-        actions.appendChild(deleteBtn);
-
-        header.appendChild(titleH3);
-        header.appendChild(actions);
-
-        // URL
-        const urlP = document.createElement('p');
-        urlP.className = 'article-url';
-        urlP.textContent = article.url;
-
-        // Preview content (image/description from backend)
-        if (article.image || article.description) {
-            const previewDiv = document.createElement('div');
-            previewDiv.className = 'article-preview-content';
-            
-            if (article.image) {
-                const img = document.createElement('img');
-                img.src = article.image;
-                img.alt = 'Article thumbnail';
-                img.className = 'article-thumbnail';
-                img.onerror = function() { this.style.display = 'none'; }; // Hide if image fails to load
-                previewDiv.appendChild(img);
-            }
-            
-            if (article.description) {
-                const descP = document.createElement('p');
-                descP.className = 'article-description-preview';
-                descP.textContent = truncate(article.description, 150);
-                previewDiv.appendChild(descP);
-            }
-            
-            li.appendChild(previewDiv);
-        }
-
-        // Tags
-        const tagsDiv = document.createElement('div');
-        tagsDiv.className = 'article-tags';
-        (article.tags || []).forEach(tag => {
-            const s = document.createElement('span');
-            s.className = 'tag';
-            s.textContent = '#' + tag;
-            tagsDiv.appendChild(s);
-        });
-
-        // Notes preview
-        const notesPreview = document.createElement('p');
-        notesPreview.className = 'article-notes-preview';
-        const noteText = (article.notes || '').trim();
-        notesPreview.textContent = noteText ? truncate(noteText, 180) : '';
-
-        li.appendChild(header);
-        li.appendChild(urlP);
-        if ((article.tags || []).length) li.appendChild(tagsDiv);
-        if (noteText) li.appendChild(notesPreview);
-
-        articleListEl.appendChild(li);
+function updateEditSectionDropdown() {
+    editSectionSelect.innerHTML = `<option value="unlisted">Unlisted</option>`;
+    sections.forEach(section => {
+        const option = document.createElement('option');
+        option.value = section.id;
+        option.textContent = section.name;
+        editSectionSelect.appendChild(option);
     });
 }
 
-function truncate(text, n) {
-    return text.length > n ? text.slice(0, n) + '…' : text;
-}
-
-// ---------- Article Actions ----------
-async function addArticle(url) {
-    // Basic URL validation
-    try {
-        const u = new URL(url);
-        url = u.toString();
-    } catch (err) {
-        alert('Please enter a valid URL.');
+// ===================================================================================
+// 5. Article Management (Lines 402-550)
+// ===================================================================================
+async function handleAddArticle() {
+    const url = articleUrlInput.value.trim();
+    if (!isValidUrl(url)) {
+        showNotification('Please enter a valid URL.', 'error');
         return;
     }
 
-    articleUrlInput.disabled = true; // Disable input while fetching
     addArticleBtn.disabled = true;
     addArticleBtn.textContent = 'Adding...';
-
-    let title = 'Untitled Article';
-    let description = null;
-    let image = null;
-
-    try {
-        // Call backend API to extract metadata
-        const response = await fetch(BACKEND_API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ url: url })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        if (data.success) {
-            title = data.title || title; // Use extracted title, fallback to default
-            description = data.description;
-            image = data.image;
-        } else {
-            console.warn(`Backend failed to extract metadata for ${url}: ${data.error}`);
-            alert(`Could not extract full metadata. Added with fallback title. Error: ${data.error}`);
-        }
-
-    } catch (error) {
-        console.error('Error contacting backend or extracting metadata:', error);
-        alert('Failed to get article details from backend. Make sure the Flask backend is running on http://127.0.0.1:5000\n\nAdding with fallback title. Check console for details.');
-    } finally {
-        articleUrlInput.disabled = false;
-        addArticleBtn.disabled = false;
-        addArticleBtn.textContent = 'Add Article';
-    }
-
-    const article = {
-        id: Date.now().toString() + Math.random().toString(36).slice(2, 8),
-        url: url,
-        title: title,
-        description: description, // Store description from backend
-        image: image,             // Store image from backend
-        read: false,
-        tags: [],
-        notes: '',
-        timestamp: Date.now()
-    };
-
-    articles.push(article);
-    saveArticles();
-    renderArticles();
     
-    articleUrlInput.value = '';
-    articleUrlInput.focus();
+    const newArticle = await api.addArticle(url, currentSectionId);
+    
+    addArticleBtn.disabled = false;
+    addArticleBtn.textContent = 'Add Article';
+
+    if (newArticle) {
+        currentArticles.unshift(newArticle);
+        renderArticles();
+        articleUrlInput.value = '';
+        showNotification('Article added successfully.', 'success');
+    }
 }
 
-function toggleReadStatus(id) {
-    const idx = articles.findIndex(a => a.id === id);
-    if (idx === -1) return;
-    articles[idx].read = !articles[idx].read;
-    saveArticles();
-    renderArticles();
+async function handleToggleRead(articleId, isRead) {
+    const updatedArticle = await api.updateArticle(articleId, { read: isRead });
+    if (updatedArticle) {
+        const index = currentArticles.findIndex(a => a.id === articleId);
+        if (index !== -1) {
+            currentArticles[index] = updatedArticle;
+            renderArticles();
+        }
+    }
 }
 
-function deleteArticle(id) {
-    if (!confirm('Delete this article?')) return;
-    articles = articles.filter(a => a.id !== id);
-    saveArticles();
-    renderArticles();
+async function handleDeleteArticle(articleId) {
+    if (!confirm('Are you sure you want to delete this article?')) return;
+    const result = await api.deleteArticle(articleId);
+    if (result && result.success) {
+        currentArticles = currentArticles.filter(a => a.id !== articleId);
+        renderArticles();
+        showNotification('Article deleted.', 'success');
+    }
 }
 
-function openEditModal(id) {
-    const article = articles.find(a => a.id === id);
+function openEditModal(articleId) {
+    const article = currentArticles.find(a => a.id === articleId);
     if (!article) return;
-    editModal.dataset.articleId = id;
-    editTitleInput.value = article.title || '';
-    editUrlInput.value = article.url || '';
-    editTagsInput.value = (article.tags || []).join(',');
-    editNotesInput.value = article.notes || '';
-    showModal(editModal);
+    
+    currentEditingArticleId = articleId;
+    editTitleInput.value = article.title;
+    editUrlInput.value = article.url;
+    editSectionSelect.value = article.sectionId;
+    editTagsInput.value = article.tags.join(', ');
+    editNotesInput.value = article.notes;
+    
+    editModal.classList.add('active');
 }
 
-function saveEdit(id, newTitle, newUrl, newNotes, newTags) {
-    const idx = articles.findIndex(a => a.id === id);
-    if (idx === -1) return;
-    articles[idx].title = newTitle;
-    if (newUrl) articles[idx].url = newUrl;
-    articles[idx].notes = newNotes;
-    articles[idx].tags = newTags;
-    saveArticles();
-    renderArticles();
+async function handleSaveEdit() {
+    const articleId = currentEditingArticleId;
+    const updates = {
+        title: editTitleInput.value.trim(),
+        url: editUrlInput.value.trim(),
+        sectionId: editSectionSelect.value,
+        tags: editTagsInput.value.split(',').map(t => t.trim()).filter(Boolean),
+        notes: editNotesInput.value.trim(),
+    };
+    
+    if (!updates.title || !isValidUrl(updates.url)) {
+        showNotification('Title and a valid URL are required.', 'error');
+        return;
+    }
+
+    const updatedArticle = await api.updateArticle(articleId, updates);
+    if (updatedArticle) {
+        // If section was changed, remove from current view
+        if (updatedArticle.sectionId !== currentSectionId) {
+            currentArticles = currentArticles.filter(a => a.id !== articleId);
+        } else {
+            const index = currentArticles.findIndex(a => a.id === articleId);
+            if (index !== -1) currentArticles[index] = updatedArticle;
+        }
+        renderArticles();
+        closeModal(editModal);
+        showNotification('Article updated.', 'success');
+    }
 }
 
-function openNotesTagsModal(id) {
-    const article = articles.find(a => a.id === id);
+function openNotesTagsModal(articleId) {
+    const article = currentArticles.find(a => a.id === articleId);
     if (!article) return;
-    notesTagsModal.dataset.articleId = id;
-    notesTagsTagsInput.value = (article.tags || []).join(',');
-    notesTagsNotesInput.value = article.notes || '';
-    showModal(notesTagsModal);
+
+    currentNotesTagsArticleId = articleId;
+    notesTagsTagsInput.value = article.tags.join(', ');
+    notesTagsNotesInput.value = article.notes;
+    notesTagsModal.classList.add('active');
 }
 
-function saveNotesTags(id, newNotes, newTags) {
-    const idx = articles.findIndex(a => a.id === id);
-    if (idx === -1) return;
-    articles[idx].notes = newNotes;
-    articles[idx].tags = newTags;
-    saveArticles();
-    renderArticles();
+async function handleSaveNotesTags() {
+    const articleId = currentNotesTagsArticleId;
+    const updates = {
+        tags: notesTagsTagsInput.value.split(',').map(t => t.trim()).filter(Boolean),
+        notes: notesTagsNotesInput.value.trim()
+    };
+    
+    const updatedArticle = await api.updateArticle(articleId, updates);
+    if (updatedArticle) {
+        const index = currentArticles.findIndex(a => a.id === articleId);
+        if (index !== -1) currentArticles[index] = updatedArticle;
+        renderArticles();
+        closeModal(notesTagsModal);
+        showNotification('Notes and tags updated.', 'success');
+    }
 }
 
-// ---------- Helpers & Events ----------
-function parseTagsString(s) {
-    if (!s) return [];
-    return s.split(',').map(t => t.trim()).filter(Boolean);
-}
+// ===================================================================================
+// 6. Rendering (Lines 552-750)
+// ===================================================================================
+function renderArticles() {
+    articleListEl.innerHTML = '';
+    
+    let filteredArticles = currentArticles;
 
-function handleArticleListClick(e) {
-    const id = e.target.dataset.id || e.target.closest('[data-id]')?.dataset.id;
-    if (!id) return;
+    // Apply read/unread filter
+    if (currentFilter === 'read') {
+        filteredArticles = filteredArticles.filter(a => a.read);
+    } else if (currentFilter === 'unread') {
+        filteredArticles = filteredArticles.filter(a => !a.read);
+    }
 
-    if (e.target.classList.contains('delete-btn')) {
-        deleteArticle(id);
+    // Apply tag filter
+    if (currentTagFilter) {
+        filteredArticles = filteredArticles.filter(a => 
+            a.tags.some(tag => tag.toLowerCase().includes(currentTagFilter))
+        );
+    }
+
+    if (filteredArticles.length === 0) {
+        articleListEl.innerHTML = '<li class="no-articles">No articles found.</li>';
         return;
     }
-    if (e.target.classList.contains('edit-btn')) {
-        openEditModal(id);
-        return;
-    }
-    if (e.target.classList.contains('notes-tags-btn')) {
-        openNotesTagsModal(id);
-        return;
-    }
+
+    filteredArticles.forEach(article => {
+        const articleEl = createArticleElement(article);
+        articleListEl.appendChild(articleEl);
+    });
 }
 
-function handleArticleListChange(e) {
-    // Toggle read checkbox
-    if (e.target.classList.contains('read-checkbox')) {
-        const id = e.target.dataset.id;
-        toggleReadStatus(id);
-    }
+function createArticleElement(article) {
+    const li = document.createElement('li');
+    li.className = 'article-item';
+    li.classList.toggle('read', article.read);
+    li.dataset.id = article.id;
+    
+    const tagsHTML = article.tags.map(tag => `<span class="tag">#${tag}</span>`).join(' ');
+
+    li.innerHTML = `
+        ${article.image ? `<img src="${article.image}" alt="Article thumbnail" class="article-thumbnail">` : ''}
+        <div class="article-content">
+            <div class="article-header">
+                <h3 class="article-title">
+                    <a href="${article.url}" target="_blank" rel="noopener noreferrer">${article.title}</a>
+                </h3>
+                <div class="article-actions">
+                    <button class="action-btn edit-btn" title="Edit Article">&#9998;</button>
+                    <button class="action-btn notes-btn" title="Notes & Tags">&#128221;</button>
+                    <button class="action-btn delete-btn" title="Delete Article">&#128465;</button>
+                </div>
+            </div>
+            <p class="article-url">${new URL(article.url).hostname}</p>
+            ${article.description ? `<p class="article-description">${article.description}</p>` : ''}
+            <div class="article-meta">
+                <div class="article-tags">${tagsHTML}</div>
+                <label class="read-toggle">
+                    <input type="checkbox" class="read-checkbox" ${article.read ? 'checked' : ''}>
+                    Mark as Read
+                </label>
+            </div>
+        </div>
+    `;
+
+    // Attach event listeners
+    li.querySelector('.read-checkbox').addEventListener('change', (e) => handleToggleRead(article.id, e.target.checked));
+    li.querySelector('.delete-btn').addEventListener('click', () => handleDeleteArticle(article.id));
+    li.querySelector('.edit-btn').addEventListener('click', () => openEditModal(article.id));
+    li.querySelector('.notes-btn').addEventListener('click', () => openNotesTagsModal(article.id));
+
+    return li;
 }
 
+// ===================================================================================
+// 7. Filters & View Mode (Lines 752-820)
+// ===================================================================================
 function setFilter(filter) {
     currentFilter = filter;
-    // manage active class
+    
     [showAllBtn, showUnreadBtn, showReadBtn].forEach(btn => btn.classList.remove('active'));
+    
     if (filter === 'all') showAllBtn.classList.add('active');
-    if (filter === 'unread') showUnreadBtn.classList.add('active');
-    if (filter === 'read') showReadBtn.classList.add('active');
+    else if (filter === 'read') showReadBtn.classList.add('active');
+    else if (filter === 'unread') showUnreadBtn.classList.add('active');
+    
     renderArticles();
 }
 
-function showModal(modal) {
-    modal.style.display = 'block';
-    modal.setAttribute('aria-hidden', 'false');
-}
-function hideModal(modal) {
-    modal.style.display = 'none';
-    modal.setAttribute('aria-hidden', 'true');
-    delete modal.dataset.articleId;
-}
-
-// ---------- Utilities ----------
-// Simple logging helper (could be enhanced)
-function log(...args) { console.log('[ReadLater]', ...args); }
-
-// View mode management
-function loadViewMode() {
-    try {
-        return localStorage.getItem(VIEW_MODE_KEY) || 'list';
-    } catch (err) {
-        return 'list';
-    }
-}
-
-function saveViewMode(mode) {
-    try {
-        localStorage.setItem(VIEW_MODE_KEY, mode);
-    } catch (err) {
-        console.error('Failed to save view mode', err);
-    }
+function handleTagFilterChange(event) {
+    currentTagFilter = event.target.value.toLowerCase().trim();
+    renderArticles();
 }
 
 function setViewMode(mode) {
     viewMode = mode;
-    saveViewMode(mode);
-    applyViewMode(mode);
+    applyViewMode();
+    saveViewMode();
 }
 
-function applyViewMode(mode) {
-    if (mode === 'grid') {
+function applyViewMode() {
+    if (viewMode === 'grid') {
         articleListEl.classList.add('grid-view');
-        listViewBtn.classList.remove('active');
         gridViewBtn.classList.add('active');
+        listViewBtn.classList.remove('active');
     } else {
         articleListEl.classList.remove('grid-view');
         listViewBtn.classList.add('active');
@@ -495,12 +567,64 @@ function applyViewMode(mode) {
     }
 }
 
-// Optional: expose articles for debugging in console
-window._readLater = { getAll: () => articles, setView: setViewMode };
+function saveViewMode() {
+    localStorage.setItem(VIEW_MODE_KEY, viewMode);
+}
 
-// End of script
-// Note on Backend: This version uses a Flask backend API to extract article metadata
-// (title, description, image) from URLs. This overcomes browser CORS restrictions.
-// Make sure to run the Flask backend (python backend/app.py) before using the app.
-// The backend fetches page content server-side and extracts Open Graph metadata.
+function loadViewMode() {
+    const savedMode = localStorage.getItem(VIEW_MODE_KEY) || 'list';
+    setViewMode(savedMode);
+}
 
+// ===================================================================================
+// 8. Utility Functions (Lines 822-900)
+// ===================================================================================
+function isValidUrl(string) {
+    try {
+        new URL(string);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function closeModal(modalElement) {
+    modalElement.classList.remove('active');
+    currentEditingArticleId = null;
+    currentNotesTagsArticleId = null;
+}
+
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
+function showLoading(isLoading) {
+    let loader = document.getElementById('loading-overlay');
+    if (isLoading && !loader) {
+        loader = document.createElement('div');
+        loader.id = 'loading-overlay';
+        loader.innerHTML = '<div class="spinner"></div>';
+        document.body.appendChild(loader);
+    } else if (!isLoading && loader) {
+        loader.remove();
+    }
+}
+
+// ===================================================================================
+// 9. Sidebar Toggle Functions (Lines 901-930)
+// ===================================================================================
+function toggleSidebar() {
+    sidebar.classList.toggle('open');
+    sidebarOverlay.classList.toggle('active');
+}
+
+function closeSidebarMenu() {
+    sidebar.classList.remove('open');
+    sidebarOverlay.classList.remove('active');
+}
